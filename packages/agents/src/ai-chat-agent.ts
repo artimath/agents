@@ -57,7 +57,7 @@ export class AIChatAgent<Env = unknown> extends Agent<Env> {
           method,
           keepalive,
           headers,
-          body, // we're reading this
+          body,
           redirect,
           integrity,
           credentials,
@@ -65,10 +65,12 @@ export class AIChatAgent<Env = unknown> extends Agent<Env> {
           referrer,
           referrerPolicy,
           window,
-          // dispatcher,
-          // duplex
         } = data.init;
-        const { messages } = JSON.parse(body as string);
+        const parsedBody = JSON.parse(body as string);
+        const messages = parsedBody.messages.map((msg: ChatMessage) => ({
+          ...msg,
+          userId: parsedBody.userId || msg.userId || undefined,
+        }));
         this.broadcastChatMessage(
           {
             type: "cf_agent_chat_messages",
@@ -82,7 +84,6 @@ export class AIChatAgent<Env = unknown> extends Agent<Env> {
             messages,
             responseMessages: response.messages,
           });
-
           await this.persistMessages(finalMessages, [connection.id]);
         });
         if (response) {
@@ -98,8 +99,11 @@ export class AIChatAgent<Env = unknown> extends Agent<Env> {
           [connection.id]
         );
       } else if (data.type === "cf_agent_chat_messages") {
-        // replace the messages with the new ones
-        await this.persistMessages(data.messages, [connection.id]);
+        const messages = data.messages.map((msg: ChatMessage) => ({
+          ...msg,
+          userId: msg.userId || undefined,
+        }));
+        await this.persistMessages(messages, [connection.id]);
       }
     }
   }
@@ -140,7 +144,6 @@ export class AIChatAgent<Env = unknown> extends Agent<Env> {
         messages,
         responseMessages: response.messages,
       });
-
       await this.persistMessages(finalMessages, []);
     });
     if (response) {

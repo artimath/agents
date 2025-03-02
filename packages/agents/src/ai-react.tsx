@@ -6,50 +6,50 @@ import type { OutgoingMessage } from "./ai-types";
 
 /**
  * Options for the useAgentChat hook
+ * @interface UseAgentChatOptions
  */
 type UseAgentChatOptions = Omit<
   Parameters<typeof useChat>[0] & {
     /** Agent connection from useAgent */
     agent: ReturnType<typeof useAgent>;
+    /** User ID for message attribution */
+    userId?: string;
   },
   "fetch"
 >;
 
-// TODO: clear cache when the agent is unmounted?
-const requestCache = new Map<string, Promise<any>>();
+// Cache for initial message fetches to prevent redundant requests
+const requestCache = new Map<string, Promise<Message[]>>();
 
 /**
  * React hook for building AI chat interfaces using an Agent
- * @param options Chat options including the agent connection
- * @returns Chat interface controls and state with added clearHistory method
+ * @param options Chat options including agent connection and userId
+ * @returns Chat interface controls with state management and history clearing
  */
 export function useAgentChat(options: UseAgentChatOptions) {
-  const { agent, ...rest } = options;
+  const { agent, userId, ...rest } = options;
+
+  // Construct URL for fetching initial messages
   const url =
     agent._pkurl.replace("ws://", "http://").replace("wss://", "https://") +
     "/get-messages";
 
+  // Fetch initial messages with caching
   const initialMessages = use(
     (() => {
       if (requestCache.has(url)) {
         return requestCache.get(url)!;
       }
-      const promise = fetch(new Request(url)).then((res) => res.json());
+      const promise = fetch(new Request(url)).then((res) => res.json()) as Promise<Message[]>;
       requestCache.set(url, promise);
       return promise;
-    })()
+    })(),
   );
 
-  async function aiFetch(
-    request: RequestInfo | URL,
-    options: RequestInit = {}
-  ) {
-    // we're going to use a websocket to do the actual "fetching"
-    // but still satisfy the type signature of the fetch function
-    // so we'll return a promise that resolves to a response
-
+  // Custom fetch function using WebSocket for AI responses
+  async function aiFetch(request: RequestInfo | URL, options: RequestInit = {}): Promise<Response> {
     const {
-      method,
+      method = "POST",
       keepalive,
       headers,
       body,
@@ -61,31 +61,14 @@ export function useAgentChat(options: UseAgentChatOptions) {
       referrer,
       referrerPolicy,
       window,
-      //  dispatcher, duplex
     } = options;
+
     const id = crypto.randomUUID();
     const abortController = new AbortController();
 
     signal?.addEventListener("abort", () => {
       abortController.abort();
     });
-
-    agent.addEventListener(
-      "message",
-      (event) => {
-        const data = JSON.parse(event.data) as OutgoingMessage;
-        if (data.type === "cf_agent_use_chat_response") {
-          if (data.id === id) {
-            controller.enqueue(new TextEncoder().encode(data.body));
-            if (data.done) {
-              controller.close();
-              abortController.abort();
-            }
-          }
-        }
-      },
-      { signal: abortController.signal }
-    );
 
     let controller: ReadableStreamDefaultController;
 
@@ -95,6 +78,34 @@ export function useAgentChat(options: UseAgentChatOptions) {
       },
     });
 
+    // Handle incoming WebSocket messages
+    agent.addEventListener(
+      "message",
+      (event) => {
+        const data = JSON.parse(event.data) as OutgoingMessage;
+        if (data.type === "cf_agent_use_chat_response" && data.id === id) {
+          controller.enqueue(new TextEncoder().encode(data.body));
+          if (data.done) {
+            controller.close();
+            abortController.abort();
+          }
+        }
+      },
+      { signal: abortController.signal },
+    );
+
+    // Parse and update body with userId if provided
+    let updatedBody = body;
+    if (body && userId) {
+      try {
+        const parsedBody = JSON.parse(body as string);
+        updatedBody = JSON.stringify({ ...parsedBody, userId });
+      } catch (e) {
+        console.warn("Failed to parse body for userId injection:", e);
+      }
+    }
+
+    // Send chat request over WebSocket
     agent.send(
       JSON.stringify({
         type: "cf_agent_use_chat_request",
@@ -104,7 +115,7 @@ export function useAgentChat(options: UseAgentChatOptions) {
           method,
           keepalive,
           headers,
-          body,
+          body: updatedBody || body,
           redirect,
           integrity,
           credentials,
@@ -112,14 +123,13 @@ export function useAgentChat(options: UseAgentChatOptions) {
           referrer,
           referrerPolicy,
           window,
-          // dispatcher,
-          // duplex
         },
-      })
+      }),
     );
 
     return new Response(stream);
   }
+
   const useChatHelpers = useChat({
     initialMessages,
     sendExtraMessageFields: true,
@@ -127,11 +137,12 @@ export function useAgentChat(options: UseAgentChatOptions) {
     ...rest,
   });
 
+  // Initialize WebSocket connection and handle events
   useEffect(() => {
     agent.send(
       JSON.stringify({
         type: "cf_agent_chat_init",
-      })
+      }),
     );
 
     function onClearHistory(event: MessageEvent) {
@@ -155,12 +166,12 @@ export function useAgentChat(options: UseAgentChatOptions) {
       agent.removeEventListener("message", onClearHistory);
       agent.removeEventListener("message", onMessages);
     };
-  }, []);
+  }, [agent, useChatHelpers]);
 
   return {
     ...useChatHelpers,
     /**
-     * Set the chat messages and synchronize with the Agent
+     * Set chat messages and sync with Agent
      * @param messages New messages to set
      */
     setMessages: (messages: Message[]) => {
@@ -169,18 +180,18 @@ export function useAgentChat(options: UseAgentChatOptions) {
         JSON.stringify({
           type: "cf_agent_chat_messages",
           messages,
-        })
+        }),
       );
     },
     /**
-     * Clear chat history on both client and Agent
+     * Clear chat history on client and Agent
      */
     clearHistory: () => {
       useChatHelpers.setMessages([]);
       agent.send(
         JSON.stringify({
           type: "cf_agent_chat_clear",
-        })
+        }),
       );
     },
   };
