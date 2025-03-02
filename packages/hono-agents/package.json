@@ -35,11 +35,11 @@
   "license": "MIT",
   "description": "Add Cloudflare Agents to your Hono app",
   "peerDependencies": {
-    "agents-sdk": "^0.0.22",
+    "agents-sdk": "workspace:*",
     "hono": "^4.6.17"
   },
   "devDependencies": {
-    "agents-sdk": "^0.0.22",
+    "agents-sdk": "workspace:*",
     "hono": "^4.6.17"
   }
 }

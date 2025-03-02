@@ -12,6 +12,7 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "cronstrue": "^2.54.0"
+    "cronstrue": "^2.54.0",
+    "agents-sdk": "workspace:*"
   }
 }
