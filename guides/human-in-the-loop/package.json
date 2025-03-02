@@ -10,5 +10,22 @@
   },
   "keywords": [],
   "author": "",
-  "license": "ISC"
+  "license": "ISC",
+  "dependencies": {
+    "agents-sdk": "workspace:*",
+    "ai": "^4.1.46",
+    "@ai-sdk/openai": "^1.1.14",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@cloudflare/vite-plugin": "0.1.7",
+    "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "^5.8.2",
+    "vite": "^6.2.0",
+    "@types/react": "^19.0.10",
+    "@types/react-dom": "^19.0.4",
+    "@cloudflare/workers-types": "^4.20250224.0"
+  }
 }

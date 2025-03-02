@@ -1,12 +1,12 @@
 name = "human-in-the-loop"
 main = "./src/server.ts"
-compatibility_date = "2025-02-21"
+compatibility_date = "2025-02-14"
 
 assets = {}
 
 
 [[durable_objects.bindings]]
-name  = "HumanInTheLoop"
+name = "HumanInTheLoop"
 class_name = "HumanInTheLoop"
 
 [[migrations]]

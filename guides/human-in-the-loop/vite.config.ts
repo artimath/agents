@@ -2,6 +2,7 @@ import { cloudflare } from "@cloudflare/vite-plugin";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 import chalk from "chalk";
+import path from "path";
 
 export default defineConfig({
   plugins: [
@@ -23,4 +24,9 @@ export default defineConfig({
       },
     },
   ],
+  resolve: {
+    alias: {
+      "agents-sdk": path.resolve(__dirname, "../../../packages/agents/dist")
+    }
+  }
 });
